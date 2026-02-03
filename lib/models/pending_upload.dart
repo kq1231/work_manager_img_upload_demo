@@ -8,13 +8,7 @@ enum UploadStatus {
   pending,
   
   @HiveField(1)
-  uploading,
-  
-  @HiveField(2)
-  success,
-  
-  @HiveField(3)
-  failed,
+  failed, // Mark as failed if max retries reached
 }
 
 @HiveType(typeId: 1)

@@ -74,10 +74,6 @@ class UploadStatusAdapter extends TypeAdapter<UploadStatus> {
       case 0:
         return UploadStatus.pending;
       case 1:
-        return UploadStatus.uploading;
-      case 2:
-        return UploadStatus.success;
-      case 3:
         return UploadStatus.failed;
       default:
         return UploadStatus.pending;
@@ -90,14 +86,8 @@ class UploadStatusAdapter extends TypeAdapter<UploadStatus> {
       case UploadStatus.pending:
         writer.writeByte(0);
         break;
-      case UploadStatus.uploading:
-        writer.writeByte(1);
-        break;
-      case UploadStatus.success:
-        writer.writeByte(2);
-        break;
       case UploadStatus.failed:
-        writer.writeByte(3);
+        writer.writeByte(1);
         break;
     }
   }

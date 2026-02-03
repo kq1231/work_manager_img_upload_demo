@@ -7,7 +7,7 @@ class HiveService {
 
   static Future<void> initialize() async {
     await Hive.initFlutter();
-    
+        
     // Register adapters
     if (!Hive.isAdapterRegistered(0)) {
       Hive.registerAdapter(UploadStatusAdapter());
@@ -30,8 +30,10 @@ class HiveService {
   }
 
   static List<PendingUpload> getPendingUploads() {
+    // Return both pending and failed uploads (both need to be uploaded)
     return uploadsBox.values
-        .where((upload) => upload.status == UploadStatus.pending)
+        .where((upload) => 
+            upload.status == UploadStatus.pending)
         .toList();
   }
 
@@ -57,7 +59,7 @@ class HiveService {
   static Box get settingsBox => Hive.box(_settingsBoxName);
   
   static String getApiUrl() {
-    return settingsBox.get('api_url', defaultValue: 'http://192.168.1.100:5000');
+    return settingsBox.get('api_url', defaultValue: 'http://192.168.1.100:5001');
   }
 
   static Future<void> setApiUrl(String url) async {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:work_manager_img_upload_demo/services/workmanager_service.dart';
 import '../models/pending_upload.dart';
 import '../services/hive_service.dart';
 import '../services/upload_service.dart';
@@ -81,7 +82,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final hasConnection = await _uploadService.hasConnection();
       if (hasConnection) {
         _showSnackBar('Uploading image...', isError: false);
-        final success = await _uploadService.uploadImage(upload);
+        // This is a foreground user action, don't increment retry count
+        final success = await _uploadService.uploadImage(upload, isBackgroundTask: false);
         
         if (success) {
           _showSnackBar('✅ Upload successful!', isError: false);
@@ -104,8 +106,15 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isProcessing = true);
     
     try {
-      await _uploadService.retryAllFailed();
-      _showSnackBar('Retry initiated', isError: false);
+      final results = await _uploadService.retryAllFailed();
+      if (results['total'] == 0) {
+        _showSnackBar('No failed uploads to retry', isError: false);
+      } else {
+        _showSnackBar(
+          '✅ ${results['success']}/${results['total']} retries succeeded',
+          isError: false,
+        );
+      }
       setState(() {});
     } catch (e) {
       _showSnackBar('Error retrying: $e', isError: true);
@@ -118,7 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isProcessing = true);
     
     try {
-      final results = await _uploadService.processQueue();
+      // This is a foreground user action, don't increment retry count
+      final results = await _uploadService.processQueue(isBackgroundTask: false);
       _showSnackBar(
         '✅ ${results['success']}/${results['total']} uploads succeeded',
         isError: false,
@@ -189,10 +199,6 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (status) {
       case UploadStatus.pending:
         return Colors.orange;
-      case UploadStatus.uploading:
-        return Colors.blue;
-      case UploadStatus.success:
-        return Colors.green;
       case UploadStatus.failed:
         return Colors.red;
     }
@@ -202,10 +208,6 @@ class _HomeScreenState extends State<HomeScreen> {
     switch (status) {
       case UploadStatus.pending:
         return Icons.schedule;
-      case UploadStatus.uploading:
-        return Icons.cloud_upload;
-      case UploadStatus.success:
-        return Icons.check_circle;
       case UploadStatus.failed:
         return Icons.error;
     }
@@ -227,13 +229,29 @@ class _HomeScreenState extends State<HomeScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: Center(
-                child: Chip(
-                  label: Text(
-                    '$pendingCount pending',
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                  backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    if (pendingCount > 0)
+                      Chip(
+                        label: Text(
+                          '$pendingCount pending',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                        backgroundColor: Colors.orange,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    if (pendingCount > 0 && failedCount > 0)
+                      const SizedBox(width: 8),
+                    if (failedCount > 0)
+                      Chip(
+                        label: Text(
+                          '$failedCount failed',
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -384,6 +402,24 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
+          const SizedBox(height: 8),
+
+          // Test Background Task Button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isProcessing || pendingCount == 0 ? null : () async {
+                  await WorkManagerService.registerOneOffTask();
+                  _showSnackBar('Background task scheduled in 5 seconds', isError: false);
+                },
+                icon: const Icon(Icons.timer),
+                label: const Text('Test Background Task (5s)'),
+              ),
+            ),
+          ),
+
           const Divider(height: 32),
 
           // Upload List Header
@@ -449,12 +485,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Status: ${upload.status.name}'),
+                              Text(_getStatusDescription(upload)),
                               if (upload.retryCount > 0)
-                                Text('Retries: ${upload.retryCount}'),
+                                Text(
+                                  'Attempts: ${upload.retryCount}/5',
+                                  style: TextStyle(
+                                    color: upload.retryCount >= 4 ? Colors.red : Colors.orange,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               if (upload.errorMessage != null)
                                 Text(
-                                  'Error: ${upload.errorMessage}',
+                                  'Last error: ${upload.errorMessage}',
                                   style: const TextStyle(color: Colors.red, fontSize: 11),
                                 ),
                               Text(
@@ -502,5 +544,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   String _formatDateTime(DateTime dt) {
     return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
+  }
+
+  String _getStatusDescription(PendingUpload upload) {
+    if (upload.status == UploadStatus.failed) {
+      return 'Failed after 5 attempts - tap retry';
+    } else if (upload.retryCount > 0) {
+      return 'Pending retry (attempt ${upload.retryCount + 1}/5)';
+    } else {
+      return 'Pending upload';
+    }
   }
 }

@@ -18,11 +18,11 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# Check if Flask is installed
-if ! python3 -c "import flask" &> /dev/null; then
+# Check if Flask and notify-py are installed
+if ! python3 -c "import flask" &> /dev/null || ! python3 -c "import notifypy" &> /dev/null; then
     echo -e "${YELLOW}📦 Installing Python dependencies...${NC}"
     cd python_api
-    pip3 install -r requirements.txt
+    pip3 install -r requirements.txt --break-system-packages
     cd ..
 fi
 
@@ -38,7 +38,10 @@ fi
 echo -e "${GREEN}✅ Local IP: ${LOCAL_IP}${NC}"
 echo ""
 echo -e "${BLUE}📱 Use this URL in your Flutter app:${NC}"
-echo -e "${GREEN}   http://${LOCAL_IP}:5000${NC}"
+echo -e "${GREEN}   http://${LOCAL_IP}:5001${NC}"
+echo ""
+echo -e "${BLUE}🔔 Desktop notifications enabled${NC}"
+echo -e "   You'll get a notification whenever an image is uploaded!"
 echo ""
 echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
 echo ""

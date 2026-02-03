@@ -15,7 +15,8 @@ class UploadService {
   }
 
   // Upload a single image
-  Future<bool> uploadImage(PendingUpload upload) async {
+  // isBackgroundTask: true when called from WorkManager, false when called from UI
+  Future<bool> uploadImage(PendingUpload upload, {bool isBackgroundTask = false}) async {
     try {
       final apiUrl = HiveService.getApiUrl();
       final file = File(upload.imagePath);
@@ -28,8 +29,7 @@ class UploadService {
         return false;
       }
 
-      // Update status to uploading
-      upload.status = UploadStatus.uploading;
+      // Mark last attempt time (no need for "uploading" state)
       upload.lastAttempt = DateTime.now();
       await HiveService.updateUpload(upload);
 
@@ -71,32 +71,75 @@ class UploadService {
         return true;
       } else {
         print('❌ Upload failed with status ${response.statusCode}');
-        upload.status = UploadStatus.failed;
         upload.errorMessage = 'Server returned ${response.statusCode}';
-        upload.retryCount++;
+        
+        // Only increment retry count if this is a background task
+        if (isBackgroundTask) {
+          upload.retryCount++;
+          print('📊 Retry count incremented to ${upload.retryCount} (background task)');
+          
+          // Only mark as failed if max retries reached
+          if (upload.retryCount >= 5) {
+            upload.status = UploadStatus.failed;
+            print('⚠️  Max retries reached for ${upload.id}');
+          }
+        } else {
+          print('ℹ️  Foreground attempt failed, retry count unchanged: ${upload.retryCount}');
+        }
+        // Otherwise stays as pending for automatic retry
+        
         await HiveService.updateUpload(upload);
         return false;
       }
     } on DioException catch (e) {
       print('❌ Upload failed (DioException): ${e.message}');
-      upload.status = UploadStatus.failed;
       upload.errorMessage = e.message ?? 'Network error';
-      upload.retryCount++;
+      
+      // Only increment retry count if this is a background task
+      if (isBackgroundTask) {
+        upload.retryCount++;
+        print('📊 Retry count incremented to ${upload.retryCount} (background task)');
+        
+        // Only mark as failed if max retries reached
+        if (upload.retryCount >= 5) {
+          upload.status = UploadStatus.failed;
+          print('⚠️  Max retries reached for ${upload.id}');
+        }
+      } else {
+        print('ℹ️  Foreground attempt failed, retry count unchanged: ${upload.retryCount}');
+      }
+      // Otherwise stays as pending for automatic retry
+      
       await HiveService.updateUpload(upload);
       return false;
     } catch (e) {
       print('❌ Upload failed (Exception): $e');
-      upload.status = UploadStatus.failed;
       upload.errorMessage = e.toString();
-      upload.retryCount++;
+      
+      // Only increment retry count if this is a background task
+      if (isBackgroundTask) {
+        upload.retryCount++;
+        print('📊 Retry count incremented to ${upload.retryCount} (background task)');
+        
+        // Only mark as failed if max retries reached
+        if (upload.retryCount >= 5) {
+          upload.status = UploadStatus.failed;
+          print('⚠️  Max retries reached for ${upload.id}');
+        }
+      } else {
+        print('ℹ️  Foreground attempt failed, retry count unchanged: ${upload.retryCount}');
+      }
+      // Otherwise stays as pending for automatic retry
+      
       await HiveService.updateUpload(upload);
       return false;
     }
   }
 
   // Process all pending uploads
-  Future<Map<String, int>> processQueue() async {
-    print('🔄 Processing upload queue...');
+  // isBackgroundTask: true when called from WorkManager, false when called from UI
+  Future<Map<String, int>> processQueue({bool isBackgroundTask = false}) async {
+    print('🔄 Processing upload queue... (${isBackgroundTask ? 'BACKGROUND' : 'FOREGROUND'})');
     
     if (!await hasConnection()) {
       print('📡 No internet connection');
@@ -106,33 +149,40 @@ class UploadService {
     final pending = HiveService.getPendingUploads();
     print('📋 Found ${pending.length} pending uploads');
 
-    int successCount = 0;
-    int failedCount = 0;
-
-    for (final upload in pending) {
-      // Skip if retry count exceeds max retries (5)
-      if (upload.retryCount >= 5) {
-        print('⏭️  Skipping ${upload.id} (max retries reached)');
-        continue;
+    // Filter out already failed uploads
+    final uploadsToProcess = pending.where((upload) {
+      if (upload.status == UploadStatus.failed) {
+        print('⏭️  Skipping ${upload.id} (marked as failed - needs manual retry)');
+        return false;
       }
+      return true;
+    }).toList();
 
-      final success = await uploadImage(upload);
-      if (success) {
-        successCount++;
-      } else {
-        failedCount++;
-      }
+    if (uploadsToProcess.isEmpty) {
+      print('ℹ️  No uploads to process');
+      return {'total': 0, 'success': 0, 'failed': 0};
     }
+
+    print('⚡ Uploading ${uploadsToProcess.length} images in parallel...');
+    
+    // Upload all images in parallel using Future.wait
+    final results = await Future.wait(
+      uploadsToProcess.map((upload) => uploadImage(upload, isBackgroundTask: isBackgroundTask)),
+    );
+
+    // Count successes and failures
+    final successCount = results.where((success) => success).length;
+    final failedCount = results.where((success) => !success).length;
 
     print('✨ Queue processing complete: $successCount succeeded, $failedCount failed');
     return {
-      'total': pending.length,
+      'total': uploadsToProcess.length,
       'success': successCount,
       'failed': failedCount,
     };
   }
 
-  // Retry a specific upload
+  // Retry a specific upload (user-initiated, foreground)
   Future<bool> retryUpload(String uploadId) async {
     final upload = HiveService.uploadsBox.get(uploadId);
     if (upload == null) {
@@ -145,23 +195,32 @@ class UploadService {
     upload.errorMessage = null;
     await HiveService.updateUpload(upload);
 
-    return await uploadImage(upload);
+    // This is a foreground user action, don't increment retry count
+    return await uploadImage(upload, isBackgroundTask: false);
   }
 
-  // Retry all failed uploads
-  Future<void> retryAllFailed() async {
+  // Retry all failed uploads (user-initiated, foreground)
+  Future<Map<String, int>> retryAllFailed() async {
     final failed = HiveService.getAllUploads()
         .where((u) => u.status == UploadStatus.failed)
         .toList();
     
-    print('🔄 Retrying ${failed.length} failed uploads');
+    print('🔄 Retrying ${failed.length} failed uploads (user-initiated)');
     
+    if (failed.isEmpty) {
+      print('ℹ️  No failed uploads to retry');
+      return {'total': 0, 'success': 0, 'failed': 0};
+    }
+
+    // Reset all to pending
     for (final upload in failed) {
       upload.status = UploadStatus.pending;
       upload.errorMessage = null;
       await HiveService.updateUpload(upload);
     }
 
-    await processQueue();
+    // This is a foreground user action, don't increment retry count
+    // Process queue will handle parallel uploads
+    return await processQueue(isBackgroundTask: false);
   }
 }

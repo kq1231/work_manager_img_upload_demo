@@ -59,6 +59,8 @@ We've created comprehensive documentation for you:
 | **ARCHITECTURE.md** | System design & data flow | To understand how it works |
 | **PROJECT_OVERVIEW.md** | What was built & why | To see the big picture |
 | **TESTING_CHECKLIST.md** | Systematic testing guide | To validate all features |
+| **DEBUGGING.md** | WorkManager debugging guide | When background tasks don't work |
+| **IOS_SETUP.md** | iOS BGTaskScheduler setup | iOS-specific configuration |
 | **python_api/README.md** | API server documentation | To understand the backend |
 
 **Recommended Reading Order:**

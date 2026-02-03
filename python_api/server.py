@@ -5,6 +5,7 @@ Accepts multipart/form-data image uploads and logs them to console
 
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+from notifypy import Notify
 import os
 from datetime import datetime
 
@@ -14,9 +15,25 @@ app = Flask(__name__)
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 SIMULATE_FAILURE = False  # Set to True to test retry logic
+ENABLE_NOTIFICATIONS = True  # Set to False to disable notifications
 
 # Create upload folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def send_notification(title, message):
+    """Send desktop notification using notify-py (cross-platform)"""
+    if not ENABLE_NOTIFICATIONS:
+        return
+    
+    try:
+        notification = Notify()
+        notification.title = title
+        notification.message = message
+        notification.application_name = "Flask Upload API"
+        notification.send()
+    except Exception as e:
+        # Don't fail the request if notification fails
+        print(f"⚠️  [WARNING] Failed to send notification: {e}")
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -46,6 +63,10 @@ def upload_image():
     # Simulate failure for testing
     if SIMULATE_FAILURE:
         print("❌ [SIMULATED FAILURE] Upload rejected for testing")
+        send_notification(
+            title="❌ Upload Failed (Simulated)",
+            message="Testing retry logic - failure mode enabled"
+        )
         return jsonify({
             'success': False,
             'error': 'Simulated failure for testing'
@@ -104,6 +125,12 @@ def upload_image():
         print(f"   Timestamp: {datetime.now().isoformat()}")
         print("=" * 60)
         
+        # Send desktop notification
+        send_notification(
+            title="✅ Image Upload Received!",
+            message=f"{unique_filename} ({file_size / 1024:.1f} KB)\nPatient: {patient_id} | Wound: {wound_id}"
+        )
+        
         return jsonify({
             'success': True,
             'message': 'Image uploaded successfully',
@@ -158,12 +185,13 @@ if __name__ == '__main__':
     print(f"   Simulate failures: {SIMULATE_FAILURE}")
     print("=" * 60)
     print("\n📡 Server will be available at:")
-    print("   - http://localhost:5000")
-    print("   - http://<YOUR_LOCAL_IP>:5000")
+    print("   - http://localhost:5001")
+    print("   - http://<YOUR_LOCAL_IP>:5001")
     print("\n💡 Get your local IP:")
     print("   macOS/Linux: ifconfig | grep 'inet ' | grep -v 127.0.0.1")
     print("   Windows: ipconfig | findstr IPv4")
     print("\n🛑 Press Ctrl+C to stop the server\n")
     
     # Run on all interfaces so it's accessible from mobile devices
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # Using port 5001 to avoid conflict with macOS AirPlay Receiver (port 5000)
+    app.run(host='0.0.0.0', port=5001, debug=True)
