@@ -71,7 +71,7 @@ void callbackDispatcher() {
 }
 
 class WorkManagerService {
-  static const String _uploadTaskName = 'uploadPendingImages';
+  static const String _uploadTaskName = 'com.example.workManagerImgUploadDemo.uploadPendingImages';
 
   // Initialize WorkManager
   static Future<void> initialize() async {
@@ -99,22 +99,23 @@ class WorkManagerService {
   // Register periodic upload task (runs every 15 minutes)
   static Future<void> registerPeriodicTask() async {
     // Cancel any existing task first to ensure clean registration
-    await Workmanager().cancelByUniqueName('periodicUploadTask');
+    await Workmanager().cancelByUniqueName(_uploadTaskName);
     
     await Workmanager().registerPeriodicTask(
-      'periodicUploadTask',
+      _uploadTaskName,
       _uploadTaskName,
       frequency: const Duration(minutes: 15),
-      // constraints: Constraints(
-      //   networkType: NetworkType.connected,
-      //   requiresBatteryNotLow: false, // Allow even when battery is low
-      //   requiresCharging: false, // Allow even when not charging
-      //   requiresDeviceIdle: false, // Don't wait for device idle
-      //   requiresStorageNotLow: false, // Don't check storage
-      // ),
-      // existingWorkPolicy: ExistingPeriodicWorkPolicy.update, // Update if exists
-      // backoffPolicy: BackoffPolicy.exponential,
-      // backoffPolicyDelay: const Duration(seconds: 30),
+      initialDelay: const Duration(seconds: 10), // Start first run after 10 seconds
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+        requiresBatteryNotLow: false, // Allow even when battery is low
+        requiresCharging: false, // Allow even when not charging
+        requiresDeviceIdle: false, // Don't wait for device idle
+        requiresStorageNotLow: false, // Don't check storage
+      ),
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.update, // Update if exists
+      backoffPolicy: BackoffPolicy.exponential,
+      backoffPolicyDelay: const Duration(seconds: 30),
     );
     print('✅ Periodic upload task registered (15 min interval)');
     print('⚠️  Note: First run in 10 seconds, then every 15 minutes');

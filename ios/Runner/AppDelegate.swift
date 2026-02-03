@@ -10,17 +10,21 @@ import workmanager_apple
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
     
+    // Set notification center delegate FIRST (before requesting permissions)
+    UNUserNotificationCenter.current().delegate = self
+    
     // Request notification permissions for iOS
-    if #available(iOS 10.0, *) {
-      UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
-        if granted {
-          NSLog("✅ Notification permissions granted")
-        } else {
-          NSLog("⚠️  Notification permissions denied")
-        }
+    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
+      if granted {
+        NSLog("✅ Notification permissions granted")
+      } else {
+        NSLog("⚠️  Notification permissions denied")
       }
-      UNUserNotificationCenter.current().delegate = self
     }
+
+    // Enable WorkManager debug notifications for iOS
+    // You will see notifications for all WorkManager events! 🔔
+    WorkmanagerDebug.setCurrent(NotificationDebugHandler())
 
     // Register WorkManager background task for iOS
     // This enables background fetch capability
@@ -38,12 +42,15 @@ import workmanager_apple
     NSLog("✅ Periodic task registered with 15-minute frequency")
     NSLog("⚠️  iOS controls actual execution timing based on user patterns")
     NSLog("⚠️  Background App Refresh must be enabled in Settings")
-
-    // Enable WorkManager debug notifications for iOS
-    // You will see notifications for all WorkManager events! 🔔
-    WorkmanagerDebug.setCurrent(LoggingDebugHandler())
-
     
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+  
+  // CRITICAL: Override to show notifications even when app is in foreground
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+      completionHandler(.alert) // shows banner even if app is in foreground
   }
 }
