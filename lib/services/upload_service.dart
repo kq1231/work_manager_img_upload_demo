@@ -45,7 +45,12 @@ class UploadService {
       });
 
       // Send request
-      print('📤 Uploading ${upload.id} to $apiUrl/api/upload');
+      // iOS background tasks have 30s limit, use shorter timeout when in background
+      final timeout = (Platform.isIOS && isBackgroundTask) 
+          ? const Duration(seconds: 10)  // iOS background: 10s per image
+          : const Duration(seconds: 30);  // Foreground or Android: 30s
+      
+      print('📤 Uploading ${upload.id} to $apiUrl/api/upload (timeout: ${timeout.inSeconds}s)');
       final response = await _dio.post(
         '$apiUrl/api/upload',
         data: formData,
@@ -53,8 +58,8 @@ class UploadService {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
-          sendTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: timeout,
+          receiveTimeout: timeout,
         ),
       );
 
@@ -161,6 +166,15 @@ class UploadService {
     if (uploadsToProcess.isEmpty) {
       print('ℹ️  No uploads to process');
       return {'total': 0, 'success': 0, 'failed': 0};
+    }
+
+    // iOS background tasks have 30-second limit
+    // Limit parallel uploads on iOS background tasks to complete within time
+    final isIOS = Platform.isIOS;
+    if (isIOS && isBackgroundTask && uploadsToProcess.length > 3) {
+      print('⚠️  iOS background mode: limiting to first 3 images (30s timeout)');
+      print('ℹ️  Remaining ${uploadsToProcess.length - 3} will be processed in next run');
+      uploadsToProcess.removeRange(3, uploadsToProcess.length);
     }
 
     print('⚡ Uploading ${uploadsToProcess.length} images in parallel...');

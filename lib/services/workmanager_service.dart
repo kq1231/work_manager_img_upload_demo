@@ -17,43 +17,35 @@ void callbackDispatcher() {
     print('🔢 Isolate: ${DateTime.now().millisecondsSinceEpoch}');
     
     try {
-      // Initialize Hive in this isolate
-      print('📦 Initializing Hive...');
-      await Hive.initFlutter();
-      
-      // Register adapters
-      if (!Hive.isAdapterRegistered(0)) {
-        Hive.registerAdapter(UploadStatusAdapter());
-        print('✅ UploadStatusAdapter registered');
-      }
-      if (!Hive.isAdapterRegistered(1)) {
-        Hive.registerAdapter(PendingUploadAdapter());
-        print('✅ PendingUploadAdapter registered');
-      }
-      
-      // Open boxes
-      print('📂 Opening Hive boxes...');
-      await Hive.openBox<PendingUpload>('pending_uploads');
-      await Hive.openBox('settings');
-      print('✅ Hive boxes opened');
-      
-      // Process uploads
-      print('🚀 Starting upload process...');
-      final uploadService = UploadService();
-      // Pass isBackgroundTask: true so retry count is incremented
-      final results = await uploadService.processQueue(isBackgroundTask: true);
+      // iOS has a 30-second limit for background tasks
+      // Add timeout to ensure we complete within limits
+      final result = await Future.any([
+        _executeUploadTask(),
+        Future.delayed(Duration(seconds: 25), () {
+          print('⚠️  iOS 25-second timeout reached, wrapping up...');
+          return {'timeout': true};
+        }),
+      ]);
       
       final duration = DateTime.now().difference(startTime);
+      
+      if (result['timeout'] == true) {
+        print('\n' + '=' * 60);
+        print('⏰ [BACKGROUND TASK] TIMEOUT');
+        print('=' * 60);
+        print('⚠️  Task stopped early to respect iOS 30s limit');
+        print('⏱️  Duration: ${duration.inSeconds}s');
+        print('=' * 60 + '\n');
+        return Future.value(true); // Still return true so task doesn't retry immediately
+      }
+      
       print('\n' + '=' * 60);
       print('✅ [BACKGROUND TASK] COMPLETED');
       print('=' * 60);
-      print('📊 Results: ${results['success']}/${results['total']} succeeded, ${results['failed']} failed');
+      print('📊 Results: ${result['success']}/${result['total']} succeeded, ${result['failed']} failed');
       print('⏱️  Duration: ${duration.inSeconds}s');
       print('⏰ End time: ${DateTime.now().toIso8601String()}');
       print('=' * 60 + '\n');
-      
-      // Close Hive
-      await Hive.close();
       
       return Future.value(true);
     } catch (e, stackTrace) {
@@ -68,6 +60,45 @@ void callbackDispatcher() {
       return Future.value(false); // Retry
     }
   });
+}
+
+// Helper function to execute the actual upload task
+Future<Map<String, dynamic>> _executeUploadTask() async {
+  try {
+    // Initialize Hive in this isolate
+    print('📦 Initializing Hive...');
+    await Hive.initFlutter();
+    
+    // Register adapters
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(UploadStatusAdapter());
+      print('✅ UploadStatusAdapter registered');
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(PendingUploadAdapter());
+      print('✅ PendingUploadAdapter registered');
+    }
+    
+    // Open boxes
+    print('📂 Opening Hive boxes...');
+    await Hive.openBox<PendingUpload>('pending_uploads');
+    await Hive.openBox('settings');
+    print('✅ Hive boxes opened');
+    
+    // Process uploads
+    print('🚀 Starting upload process...');
+    final uploadService = UploadService();
+    // Pass isBackgroundTask: true so retry count is incremented
+    final results = await uploadService.processQueue(isBackgroundTask: true);
+    
+    // Close Hive
+    await Hive.close();
+    
+    return results;
+  } catch (e) {
+    print('💥 Upload task error: $e');
+    rethrow;
+  }
 }
 
 class WorkManagerService {
@@ -99,11 +130,11 @@ class WorkManagerService {
   // Register periodic upload task (runs every 15 minutes)
   static Future<void> registerPeriodicTask() async {
     // Cancel any existing task first to ensure clean registration
-    await Workmanager().cancelByUniqueName(_uploadTaskName);
+    await Workmanager().cancelByUniqueName('periodicUploadTask');
     
     await Workmanager().registerPeriodicTask(
-      _uploadTaskName,
-      _uploadTaskName,
+      'periodicUploadTask',  // uniqueName for cancellation
+      _uploadTaskName,       // taskName that matches iOS identifier
       frequency: const Duration(minutes: 15),
       initialDelay: const Duration(seconds: 10), // Start first run after 10 seconds
       constraints: Constraints(
@@ -119,7 +150,7 @@ class WorkManagerService {
     );
     print('✅ Periodic upload task registered (15 min interval)');
     print('⚠️  Note: First run in 10 seconds, then every 15 minutes');
-    print('⚠️  Android may delay execution due to battery optimization');
+    print('⚠️  iOS: 30-second execution limit per task');
   }
 
   // Cancel all tasks
