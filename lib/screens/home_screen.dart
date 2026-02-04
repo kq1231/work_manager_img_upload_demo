@@ -83,15 +83,21 @@ class _HomeScreenState extends State<HomeScreen> {
       if (hasConnection) {
         _showSnackBar('Uploading image...', isError: false);
         // This is a foreground user action, don't increment retry count
-        final success = await _uploadService.uploadImage(upload, isBackgroundTask: false);
-        
+        final success = await _uploadService.uploadImage(
+          upload,
+          isBackgroundTask: false,
+        );
+
         if (success) {
           _showSnackBar('✅ Upload successful!', isError: false);
         } else {
           _showSnackBar('⏳ Queued for background upload', isError: false);
         }
       } else {
-        _showSnackBar('📡 Offline - queued for background upload', isError: false);
+        _showSnackBar(
+          '📡 Offline - queued for background upload',
+          isError: false,
+        );
       }
 
       setState(() {});
@@ -104,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _retryAll() async {
     setState(() => _isProcessing = true);
-    
+
     try {
       final results = await _uploadService.retryAllFailed();
       if (results['total'] == 0) {
@@ -125,10 +131,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _processQueue() async {
     setState(() => _isProcessing = true);
-    
+
     try {
       // This is a foreground user action, don't increment retry count
-      final results = await _uploadService.processQueue(isBackgroundTask: false);
+      final results = await _uploadService.processQueue(
+        isBackgroundTask: false,
+      );
       _showSnackBar(
         '✅ ${results['success']}/${results['total']} uploads succeeded',
         isError: false,
@@ -146,7 +154,9 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Clear All Uploads?'),
-        content: const Text('This will remove all pending uploads and delete their image files.'),
+        content: const Text(
+          'This will remove all pending uploads and delete their image files.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -170,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
             await file.delete();
           }
         } catch (e) {
-          print('Error deleting file: $e');
+          //
         }
       }
 
@@ -216,8 +226,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final uploads = HiveService.getAllUploads();
-    final pendingCount = uploads.where((u) => u.status == UploadStatus.pending).length;
-    final failedCount = uploads.where((u) => u.status == UploadStatus.failed).length;
+    final pendingCount = uploads
+        .where((u) => u.status == UploadStatus.pending)
+        .length;
+    final failedCount = uploads
+        .where((u) => u.status == UploadStatus.failed)
+        .length;
 
     return Scaffold(
       appBar: AppBar(
@@ -235,7 +249,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Chip(
                         label: Text(
                           '$pendingCount pending',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
                         ),
                         backgroundColor: Colors.orange,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -246,7 +263,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       Chip(
                         label: Text(
                           '$failedCount failed',
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
                         ),
                         backgroundColor: Colors.red,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -280,7 +300,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           labelText: 'API URL',
                           hintText: 'http://192.168.1.100:5000',
                           border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -300,7 +323,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Patient ID',
                           border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -311,7 +337,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         decoration: const InputDecoration(
                           labelText: 'Wound ID',
                           border: OutlineInputBorder(),
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                         ),
                       ),
                     ),
@@ -328,7 +357,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : () => _pickImage(ImageSource.camera),
+                    onPressed: _isProcessing
+                        ? null
+                        : () => _pickImage(ImageSource.camera),
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Camera'),
                     style: ElevatedButton.styleFrom(
@@ -339,7 +370,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing ? null : () => _pickImage(ImageSource.gallery),
+                    onPressed: _isProcessing
+                        ? null
+                        : () => _pickImage(ImageSource.gallery),
                     icon: const Icon(Icons.photo_library),
                     label: const Text('Gallery'),
                     style: ElevatedButton.styleFrom(
@@ -358,7 +391,9 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing || pendingCount == 0 ? null : _processQueue,
+                    onPressed: _isProcessing || pendingCount == 0
+                        ? null
+                        : _processQueue,
                     icon: const Icon(Icons.refresh),
                     label: const Text('Process Queue'),
                     style: ElevatedButton.styleFrom(
@@ -370,7 +405,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing || failedCount == 0 ? null : _retryAll,
+                    onPressed: _isProcessing || failedCount == 0
+                        ? null
+                        : _retryAll,
                     icon: const Icon(Icons.replay),
                     label: const Text('Retry Failed'),
                     style: ElevatedButton.styleFrom(
@@ -410,12 +447,17 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: _isProcessing || pendingCount == 0 ? null : () async {
-                  await WorkManagerService.registerOneOffTask();
-                  _showSnackBar('Background task scheduled in 5 seconds', isError: false);
-                },
+                onPressed: _isProcessing || pendingCount == 0
+                    ? null
+                    : () async {
+                        await WorkManagerService.registerOneOffTask();
+                        _showSnackBar(
+                          'Background task scheduled',
+                          isError: false,
+                        );
+                      },
                 icon: const Icon(Icons.timer),
-                label: const Text('Test Background Task (5s)'),
+                label: const Text('Test Background Task'),
               ),
             ),
           ),
@@ -430,7 +472,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text(
                   'Upload Queue (${uploads.length})',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Text(
                   'Failed: $failedCount',
@@ -468,7 +513,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       final upload = uploads[index];
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: _getStatusColor(upload.status),
@@ -490,14 +538,19 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Text(
                                   'Attempts: ${upload.retryCount}/5',
                                   style: TextStyle(
-                                    color: upload.retryCount >= 4 ? Colors.red : Colors.orange,
+                                    color: upload.retryCount >= 4
+                                        ? Colors.red
+                                        : Colors.orange,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               if (upload.errorMessage != null)
                                 Text(
                                   'Last error: ${upload.errorMessage}',
-                                  style: const TextStyle(color: Colors.red, fontSize: 11),
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               Text(
                                 'Created: ${_formatDateTime(upload.createdAt)}',
@@ -507,7 +560,10 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           trailing: upload.status == UploadStatus.failed
                               ? IconButton(
-                                  icon: const Icon(Icons.replay, color: Colors.blue),
+                                  icon: const Icon(
+                                    Icons.replay,
+                                    color: Colors.blue,
+                                  ),
                                   onPressed: () async {
                                     setState(() => _isProcessing = true);
                                     await _uploadService.retryUpload(upload.id);

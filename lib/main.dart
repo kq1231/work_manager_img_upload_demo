@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'services/hive_service.dart';
 import 'services/workmanager_service.dart';
@@ -5,17 +7,26 @@ import 'screens/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize Hive
   await HiveService.initialize();
-  print('✅ Hive initialized');
-  
+
   // Initialize WorkManager
   await WorkManagerService.initialize();
-  
+
   // Register periodic upload task
   await WorkManagerService.registerPeriodicTask();
-  
+
+  // iOS 13+ only
+  if (Platform.isIOS) {
+    await WorkManagerService.printScheduledTasks();
+  }
+
+  // Execute one off task whenever app is launched
+  // This will upload all pending images immediately and in the background
+  // Why work manager for this? Because it will work even if app is closed immediately after launching
+  await WorkManagerService.registerOneOffTask();
+
   runApp(const MyApp());
 }
 
