@@ -132,12 +132,7 @@ class UploadService {
     final pending = HiveService.getPendingUploads();
 
     // Filter out already failed uploads
-    final uploadsToProcess = pending.where((upload) {
-      if (upload.status == UploadStatus.failed) {
-        return false;
-      }
-      return true;
-    }).toList();
+    final uploadsToProcess = pending;
 
     if (uploadsToProcess.isEmpty) {
       return {'total': 0, 'success': 0, 'failed': 0};
