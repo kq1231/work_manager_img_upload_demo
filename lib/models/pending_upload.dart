@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:hive/hive.dart';
 
 part 'pending_upload.g.dart';
@@ -17,7 +18,7 @@ class PendingUpload extends HiveObject {
   final String id;
 
   @HiveField(1)
-  final String imagePath;
+  final Uint8List imageBytes;
 
   @HiveField(2)
   final String patientId;
@@ -40,9 +41,13 @@ class PendingUpload extends HiveObject {
   @HiveField(8)
   DateTime? lastAttempt;
 
+  @HiveField(9)
+  final String fileName;
+
   PendingUpload({
     required this.id,
-    required this.imagePath,
+    required this.imageBytes,
+    required this.fileName,
     required this.patientId,
     required this.woundId,
     required this.createdAt,

@@ -22,24 +22,16 @@ class UploadService {
   }) async {
     try {
       final apiUrl = HiveService.getApiUrl();
-      final file = File(upload.imagePath);
-
-      if (!await file.exists()) {
-        upload.status = UploadStatus.failed;
-        upload.errorMessage = 'Image file not found';
-        await HiveService.updateUpload(upload);
-        return false;
-      }
 
       // Mark last attempt time (no need for "uploading" state)
       upload.lastAttempt = DateTime.now();
       await HiveService.updateUpload(upload);
 
-      // Create multipart request
+      // Create multipart request using image bytes from Hive
       final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(
-          upload.imagePath,
-          filename: upload.imagePath.split('/').last,
+        'image': MultipartFile.fromBytes(
+          upload.imageBytes,
+          filename: upload.fileName,
         ),
         'patientId': upload.patientId,
         'woundId': upload.woundId,
@@ -63,10 +55,7 @@ class UploadService {
       );
 
       if (response.statusCode == 200) {
-        // Delete the image file
-        await file.delete();
-
-        // Remove from Hive
+        // Remove from Hive (no file to delete since image is stored as bytes)
         await HiveService.removeUpload(upload.id);
 
         return true;

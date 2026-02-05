@@ -18,7 +18,8 @@ class PendingUploadAdapter extends TypeAdapter<PendingUpload> {
     };
     return PendingUpload(
       id: fields[0] as String,
-      imagePath: fields[1] as String,
+      imageBytes: fields[1] as Uint8List,
+      fileName: fields[9] as String,
       patientId: fields[2] as String,
       woundId: fields[3] as String,
       createdAt: fields[4] as DateTime,
@@ -32,11 +33,11 @@ class PendingUploadAdapter extends TypeAdapter<PendingUpload> {
   @override
   void write(BinaryWriter writer, PendingUpload obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.imagePath)
+      ..write(obj.imageBytes)
       ..writeByte(2)
       ..write(obj.patientId)
       ..writeByte(3)
@@ -50,7 +51,9 @@ class PendingUploadAdapter extends TypeAdapter<PendingUpload> {
       ..writeByte(7)
       ..write(obj.errorMessage)
       ..writeByte(8)
-      ..write(obj.lastAttempt);
+      ..write(obj.lastAttempt)
+      ..writeByte(9)
+      ..write(obj.fileName);
   }
 
   @override

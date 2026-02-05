@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:work_manager_img_upload_demo/services/workmanager_service.dart';
 import '../models/pending_upload.dart';
@@ -60,16 +59,16 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // Copy image to app documents directory
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = '${_uuid.v4()}.jpg';
-      final savedPath = '${appDir.path}/$fileName';
-      await File(image.path).copy(savedPath);
+      // Read image as bytes instead of saving to file system
+      final imageBytes = await File(image.path).readAsBytes();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = '${_uuid.v4()}_$timestamp.jpg';
 
-      // Create pending upload
+      // Create pending upload with image bytes
       final upload = PendingUpload(
         id: _uuid.v4(),
-        imagePath: savedPath,
+        imageBytes: imageBytes,
+        fileName: fileName,
         patientId: _patientIdController.text,
         woundId: _woundIdController.text,
         createdAt: DateTime.now(),
@@ -171,19 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (confirm == true) {
-      // Delete all image files
-      final uploads = HiveService.getAllUploads();
-      for (final upload in uploads) {
-        try {
-          final file = File(upload.imagePath);
-          if (await file.exists()) {
-            await file.delete();
-          }
-        } catch (e) {
-          //
-        }
-      }
-
+      // No need to delete files since images are stored as bytes in Hive
       await HiveService.clearAllUploads();
       setState(() {});
       _showSnackBar('All uploads cleared', isError: false);
